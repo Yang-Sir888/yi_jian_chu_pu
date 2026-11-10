@@ -1,0 +1,42 @@
+# This prepares a paid, persistent service. Review the price in Render before approval.
+# No resource is created by committing this file.
+services:
+  - type: web
+    name: guoyun-puyin
+    runtime: node
+    repo: https://github.com/Yang-Sir888/yi_jian_chu_pu
+    branch: main
+    region: singapore
+    plan: 0.5c-512mb
+    numInstances: 1
+    buildCommand: node scripts/build-server.mjs
+    startCommand: node scripts/start-local.mjs
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    disk:
+      name: guoyun-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data
+      - key: TCB_PG_PROXY
+        value: "0"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: MAX_MODEL_CALLS_PER_DAY
+        value: "100"
+      - key: MAX_STORAGE_MB
+        value: "512"
+      - key: MODEL_VAULT_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: EXPERT_PASSWORD
+        sync: false

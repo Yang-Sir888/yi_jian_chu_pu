@@ -18,6 +18,18 @@ function record(data) {
   fs.writeFileSync(ARTIFACT, JSON.stringify({...data, createdAt: new Date().toISOString()}, null, 2), {mode: 0o600});
 }
 
+// Runtime secrets are only bootstrap inputs, never password-reset controls.
+// Validate both before creating either account so a typo cannot leave a
+// partially initialized deployment that silently skips the expert next boot.
+function configuredPassword(name) {
+  const value = process.env[name];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.length < 12 || value.length > 128) {
+    throw new Error(`${name} 长度须为 12–128 个字符`);
+  }
+  return value;
+}
+
 const db = createDb();
 try {
   await ensureSchema(db);
@@ -27,9 +39,11 @@ try {
     // Do not overwrite the only copy of the initial credentials on a second run.
     if (!fs.existsSync(ARTIFACT)) record({existing: true});
   } else {
-    const adminPassword = randomPassword();
+    const suppliedAdmin = configuredPassword('ADMIN_PASSWORD');
+    const suppliedExpert = configuredPassword('EXPERT_PASSWORD');
+    const adminPassword = suppliedAdmin ?? randomPassword();
     await createUser(repo, {username: 'admin', displayName: '平台管理员', password: adminPassword, admin: true});
-    const expertPassword = await ensureExpert(repo);
+    const expertPassword = await ensureExpert(repo, suppliedExpert);
     record({
       admin: {username: 'admin', initialPassword: adminPassword},
       ...(expertPassword ? {expert: expertPassword} : {}),
@@ -44,9 +58,14 @@ try {
   await db.end().catch(() => {});
 }
 
-async function ensureExpert(repo) {
+async function ensureExpert(repo, suppliedPassword) {
   if (await repo.userByName('expert01')) return null;
-  const password = randomPassword();
-  await createUser(repo, {username: 'expert01', displayName: '试用专家', password});
+  const password = suppliedPassword ?? randomPassword();
+  await createUser(repo, {
+    username: 'expert01', displayName: '试用专家', password,
+    // A deployment owner can supply a ready-to-use review account. Random local
+    // credentials retain the existing mandatory initial password change.
+    mustChange: suppliedPassword === undefined,
+  });
   return {username: 'expert01', initialPassword: password};
 }

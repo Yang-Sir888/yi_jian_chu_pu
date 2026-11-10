@@ -16,7 +16,10 @@ export function configFromEnv(env = process.env) {  const production = env.NODE_
   const fallbackOrigin = env.CODESPACE_NAME || env.X_IDE_SPACE_ID
     ? `http://localhost:${env.PREVIEW_PORT || 55221}`
     : `http://localhost:${env.PORT || 3000}`;
-  const origin = (env.APP_ORIGIN || fallbackOrigin).replace(/\/+$/, '');
+  // Render supplies this trusted runtime value after assigning its public URL.
+  // It must still pass the same strict URL validation as an explicit origin.
+  const renderOrigin = env.RENDER === 'true' ? env.RENDER_EXTERNAL_URL : '';
+  const origin = (env.APP_ORIGIN || renderOrigin || fallbackOrigin).replace(/\/+$/, '');
   const config = {
     production,
     origin,

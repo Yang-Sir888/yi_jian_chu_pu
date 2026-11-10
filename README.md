@@ -42,6 +42,8 @@ npm start
 
 ## 云端与 GitHub
 
+原 chatgpt.site 入口已确认在用户电脑和移动网络下被拦截。独立托管配置已准备并校验，但尚未部署：[Render 部署说明](docs/独立评审入口部署.md)。这是付费持久化方案，须用户连接账号并核对费用后创建资源。
+
 GitHub 保存源码并运行构建检查；GitHub Pages 不运行本平台的鉴权、数据库或密钥代理。云端适配器位于 cloud/，使用 Worker、D1 和私有 R2；.openai/hosting.json 记录 Sites 项目。Docker 部署保留 Express 及 PGlite/外部 PostgreSQL。
 
 ```sh
