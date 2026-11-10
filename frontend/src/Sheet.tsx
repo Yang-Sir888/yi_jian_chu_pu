@@ -9,8 +9,20 @@ function Sheet({score,selection,onSelect,playTime=-1},ref){
   const titleExtra=(titleLines.length-1)*32;
   const left=60,top=160+titleExtra,rowHeight=135;
   const noteWidth=(n:Score['measures'][number]['notes'][number])=>Math.max(n.base===1?112:n.base===2?68:42,(n.lyric?.length||0)*14+10);
-  const desired=score.measures.map(m=>Math.max(220,m.notes.reduce((s,n)=>s+noteWidth(n),0)+38));
-  const width=Math.max(1000,...desired.map(w=>w+120));let row=0,usedWidth=0;
+  // Visual continuations keep dense bars readable without changing musical bars,
+  // note indices, source timestamps, or the score sent to exports and playback.
+  const chunks=score.measures.flatMap((measure,mi)=>{
+    const groups:{mi:number;part:number;last:boolean;notes:{n:Score['measures'][number]['notes'][number];ni:number}[]}[]=[];
+    let notes:{n:Score['measures'][number]['notes'][number];ni:number}[]=[],used=0;
+    for(let ni=0;ni<measure.notes.length;ni++){
+      const n=measure.notes[ni],width=noteWidth(n);
+      if(notes.length&&used+width>842){groups.push({mi,part:groups.length,last:false,notes});notes=[];used=0;}
+      notes.push({n,ni});used+=width;
+    }
+    groups.push({mi,part:groups.length,last:true,notes});return groups;
+  });
+  const desired=chunks.map(c=>Math.max(220,c.notes.reduce((s,{n})=>s+noteWidth(n),0)+38));
+  const width=1000;let row=0,usedWidth=0;
   const layout=desired.map(w=>{if(usedWidth&&usedWidth+w>width-120){row++;usedWidth=0;}const box={x:left+usedWidth,y:top+row*rowHeight,w};usedWidth+=w;return box;});
   const height=Math.max(400,top+(row+1)*rowHeight+60);
   let elapsed=0;
@@ -20,18 +32,19 @@ function Sheet({score,selection,onSelect,playTime=-1},ref){
     <rect x="22" y="22" width={width-44} height={height-44} fill="none" stroke="#e6dcc6" strokeWidth="1"/>
     {titleLines.map((line,i)=><text key={i} x={width/2} y={56+i*32} textAnchor="middle" fill="#2b2419" fontSize="27" fontFamily="serif" fontWeight="600">{line}</text>)}
     <text x={width/2} y={85+titleExtra} textAnchor="middle" fill="#8a7d63" fontSize="12">{score.subtitle||'民族音乐 · 专家校订谱'}</text>
-    <text x={left} y={120+titleExtra} fontSize="15" fill="#4a4232">{'1='+score.key+'     '+(score.mode==='free'?'自由节奏':score.meter.join('/')+(score.estimates?.meter?'（暂定）':''))+'     ♩='+score.tempo+(score.estimates?.tempo?'（估计）':'')}</text>
+    <text x={left} y={120+titleExtra} fontSize="15" fill="#4a4232" xmlSpace="preserve">{'1='+score.key+'     '+(score.mode==='free'?'自由节奏':score.meter.join('/')+(score.estimates?.meter?'（暂定）':''))+'     ♩='+score.tempo+(score.estimates?.tempo?'（估计）':'')}</text>
     <text x={width-left} y={120+titleExtra} fontSize="12" textAnchor="end" fill="#8a7d63">{[score.lyricist&&'词：'+score.lyricist,score.composer&&'曲：'+score.composer].filter(Boolean).join('　')}</text>
-    {score.measures.map((m,mi)=>{
-      const {x,y,w:barWidth}=layout[mi];
-      const weights=m.notes.map(n=>Math.max(0.7,ticksOf(n)/PPQ)),sum=Math.max(1,weights.reduce((a,b)=>a+b,0));
-      const space=Math.max(0,barWidth-38-m.notes.reduce((s,n)=>s+noteWidth(n),0));
+    {chunks.map((chunk,ci)=>{
+      const {mi,notes,part,last}=chunk;
+      const {x,y,w:barWidth}=layout[ci];
+      const weights=notes.map(({n})=>Math.max(0.7,ticksOf(n)/PPQ)),sum=Math.max(1,weights.reduce((a,b)=>a+b,0));
+      const space=Math.max(0,barWidth-38-notes.reduce((s,{n})=>s+noteWidth(n),0));
       let used=0,usedNatural=0;
-      return <g key={m.id+'-'+mi}>
-        <text x={x+4} y={y-23} fontSize="10" fill="#b3a584">{String(mi+1).padStart(2,'0')}</text>
-        {m.notes.map((n,ni)=>{
+      return <g key={mi+'-'+part}>
+        <text x={x+4} y={y-23} fontSize="10" fill="#b3a584">{String(mi+1).padStart(2,'0')+(part?' · 续':'')}</text>
+        {notes.map(({n,ni},localIndex)=>{
           const natural=noteWidth(n);
-          const nx=x+20+usedNatural+(used+weights[ni]/2)/sum*space;used+=weights[ni];usedNatural+=natural;
+          const nx=x+20+usedNatural+(used+weights[localIndex]/2)/sum*space;used+=weights[localIndex];usedNatural+=natural;
           const duration=noteSeconds(score,n);
           const playing=playTime>=elapsed&&playTime<elapsed+duration;elapsed+=duration;
           const selected=selection?.[0]===mi&&selection?.[1]===ni;
@@ -50,8 +63,9 @@ function Sheet({score,selection,onSelect,playTime=-1},ref){
             {n.exactTicks&&<text x={nx} y={y+74} fontSize="9" textAnchor="middle" fill="#a2937a">精确时值 {n.exactTicks}/960 拍</text>}{n.lyric&&<text x={nx} y={y+58} textAnchor="middle" fontSize="12" fill="#5c5344">{n.lyric}</text>}
           </g>;
         })}
-        {score.mode!=='free'&&<line x1={x+barWidth-1} x2={x+barWidth-1} y1={y-15} y2={y+26} stroke="#7a6c55" strokeWidth={mi===score.measures.length-1?3:1}/>}
-        {score.mode!=='free'&&mi===score.measures.length-1&&<line x1={x+barWidth-6} x2={x+barWidth-6} y1={y-15} y2={y+26} stroke="#7a6c55"/>}
+        {!last&&<text x={x+barWidth-8} y={y+5} textAnchor="end" fontSize="12" fill="#a2937a">↪</text>}
+        {score.mode!=='free'&&last&&<line x1={x+barWidth-1} x2={x+barWidth-1} y1={y-15} y2={y+26} stroke="#7a6c55" strokeWidth={mi===score.measures.length-1?3:1}/>}
+        {score.mode!=='free'&&last&&mi===score.measures.length-1&&<line x1={x+barWidth-6} x2={x+barWidth-6} y1={y-15} y2={y+26} stroke="#7a6c55"/>}
       </g>;
     })}
     <text x={width/2} y={height-22} textAnchor="middle" fontSize="10" fill="#a2937a">国韵谱音 · 面向民族音乐传承的智能简谱识别与生成平台　｜　请对照原曲核校</text>

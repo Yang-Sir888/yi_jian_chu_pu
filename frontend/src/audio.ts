@@ -18,7 +18,7 @@ export async function decodeFile(file:File,sampleRate:number){
     return {data,duration:buffer.duration};
   }finally{await ctx.close();}
 }
-export async function recognize(file:File,engine:Engine,onProgress:(p:number)=>void,signal:AbortSignal,options:{reviewWithCrepe?:boolean;mode?:string;onStage?:(stage:string)=>void}={}):Promise<any> {
+export async function recognize(file:File,engine:Engine,onProgress:(p:number)=>void,signal:AbortSignal,options:{reviewWithCrepe?:boolean;mode?:string;preserveShortNotes?:boolean;onStage?:(stage:string)=>void}={}):Promise<any> {
   if(signal.aborted)throw new Error('已取消识别');
   const sampleRate=engine==='yin'?8000:22050;
   const decoded=await decodeFile(file,sampleRate);
@@ -35,6 +35,6 @@ export async function recognize(file:File,engine:Engine,onProgress:(p:number)=>v
       if(e.data.kind==='error')finish(new Error(e.data.message));
     };
     worker.onerror=()=>finish(new Error('识别模型加载或运行失败，可选择 YIN 备用识别'));
-    worker.postMessage({engine,reviewWithCrepe:options.reviewWithCrepe,mode:options.mode,...decoded,sampleRate,title:file.name.replace(/\.[^.]+$/,'').slice(0,120)},[decoded.data.buffer]);
+    worker.postMessage({engine,reviewWithCrepe:options.reviewWithCrepe,mode:options.mode,preserveShortNotes:options.preserveShortNotes,...decoded,sampleRate,title:file.name.replace(/\.[^.]+$/,'').slice(0,120)},[decoded.data.buffer]);
   });
 }

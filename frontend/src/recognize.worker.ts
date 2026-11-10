@@ -2,7 +2,7 @@ import type {RawEvent} from './types';
 import {melodyEvents,eventsToScore} from './core/transcription.mjs';
 import {analyzeFrames,segmentNotes,estimateTempo} from './core/analysis.mjs';
 self.onmessage=async message=>{
- const {data,duration,sampleRate,title,engine,reviewWithCrepe=false,mode='metered'}=message.data;
+ const {data,duration,sampleRate,title,engine,reviewWithCrepe=false,mode='metered',preserveShortNotes=false}=message.data;
  const send=(stage:string,value:number)=>self.postMessage({kind:'progress',value,stage});
  try{
   let raw:RawEvent[]=[],review:any[]=[];
@@ -22,7 +22,9 @@ self.onmessage=async message=>{
      tf.engine().startScope();
      try{
       await tracker.evaluateModel(data.subarray(Math.round(lo*sampleRate),Math.round(hi*sampleRate)),(f,o)=>{frames.push(...f);onsets.push(...o);},p=>send('Basic Pitch 识别',Math.min(.8,(at+p*8)/duration*.8)));
-      const candidates=noteFramesToTime(outputToNotesPoly(frames,onsets,.25,.25,1)).map(n=>({...n,startTimeSeconds:n.startTimeSeconds+lo}));
+      // A candidate-duration tradeoff, applied to every recording. The sensitive
+      // option retains shorter ornaments, at the cost of more spurious events.
+      const candidates=noteFramesToTime(outputToNotesPoly(frames,onsets,.25,.25,preserveShortNotes?5:11)).map(n=>({...n,startTimeSeconds:n.startTimeSeconds+lo}));
       for(const n of melodyEvents(candidates)){
        if(n.end<=at||n.start>=at+8)continue;
        const event={...n,id:'bp-'+raw.length,start:Math.max(at,n.start),end:Math.min(at+8,n.end)};
@@ -60,6 +62,6 @@ self.onmessage=async message=>{
   if(raw.length>5000)throw new Error('音符数量过多，请截取较短片段');
   const tempo=Math.max(40,Math.min(200,Math.round(estimateTempo(raw).bpm)));
   const score=eventsToScore(raw,{title,tempo,mode});
-  send('识别完成',1);self.postMessage({kind:'result',result:{score,offset:raw[0].start,rawEvents:raw,review,reviewEngine:reviewWithCrepe?'crepe-tiny-experimental':'none'}});
+  send('识别完成',1);self.postMessage({kind:'result',result:{score,offset:raw[0].start,rawEvents:raw,review,reviewEngine:engine!=='yin'&&reviewWithCrepe?'crepe-tiny-experimental':'none'}});
  }catch(e){self.postMessage({kind:'error',message:e instanceof Error?e.message:'识别未完成'});}
 };

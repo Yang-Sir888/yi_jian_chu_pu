@@ -54,6 +54,7 @@ function Workbench({user: currentUser}: {user: User}) {
   const [page, setPage] = useState<'studio' | 'admin' | 'password'>('studio');
   const [mode, setMode] = useState<'metered' | 'free'>('metered');
   const [crepe, setCrepe] = useState(false);
+  const [preserveShortNotes, setPreserveShortNotes] = useState(false);
   const [undo, setUndo] = useState<Score[]>([]);
   const segmentEnd = useRef<number | null>(null);
   const sheet = useRef<SVGSVGElement>(null);
@@ -129,14 +130,14 @@ function Workbench({user: currentUser}: {user: User}) {
     setBusy('识别旋律中');
     let recognized = false;
     try {
-      const result = await recognize(file, engine, setProgress, controller.signal, {reviewWithCrepe: crepe, mode, onStage: setProgressStage});
+      const result = await recognize(file, engine, setProgress, controller.signal, {reviewWithCrepe: crepe, mode, preserveShortNotes, onStage: setProgressStage});
       recognized = true;
       const base = emptyWork(result.score, engine, instruction);
       base.rawEvents = result.rawEvents;
       base.review = result.review;
       base.reviewEngine = result.reviewEngine;
       base.sourceOffset = result.offset;
-      base.events = [{kind: 'stage', text: '使用 ' + engineNames[engine] + ' 识别 ' + file.name}];
+      base.events = [{kind: 'stage', text: '使用 ' + engineNames[engine] + ' 识别 ' + file.name + (engine === 'basic-pitch' ? '；候选时长过滤阈值 ' + (preserveShortNotes ? '5 帧（约 58ms，短音灵敏）' : '11 帧（约 128ms，标准）') : '') + '；CREPE 实验复核：' + (engine === 'basic-pitch' && crepe ? '开' : '关') + '；节奏模式：' + (mode === 'free' ? '自由节奏' : '按拍整理')}];
       setWork(base); setOffset(result.offset); setDirty(true); setSelection(null);
       if (instruction.trim()) await arrange(base);
       else setNotice('识别草稿已生成。请先试听、校订，再保存或导出；可按需填写记谱要求使用智能整理。');
@@ -218,6 +219,7 @@ function Workbench({user: currentUser}: {user: User}) {
     ? score.measures.flatMap((m, mi) => m.notes.map((n, ni) => ({measureIndex: mi, noteIndex: ni, review: n.review}))).filter(n => n.review)
     : [];
   const noteCount = score?.measures.reduce((n, m) => n + m.notes.filter(x => x.pitch !== 0).length, 0) || 0;
+  const hasCandidates = Array.isArray(work?.rawEvents) && (work?.engine === 'basic-pitch' || work?.engine === 'yin');
   function exportWork(format: string) {
     if (!work || !score) return;
     try {
@@ -226,7 +228,7 @@ function Workbench({user: currentUser}: {user: User}) {
       if (format === 'mid') download(midiBytes(score) as BlobPart, score.title, 'mid', 'audio/midi');
       if (format === 'json') download(exportEvidence(work, instruction, offset), score.title + '-校订记录', 'json', 'application/json');
       if (exportMenu.current) exportMenu.current.open = false;
-      setNotice('已导出。' + (format === 'musicxml' ? '可使用 MuseScore 等专业软件继续编辑；自由节奏的显示时值为近似。' : format === 'json' ? '核验文件包含谱面、模型原始事件与操作记录，不含音频或 API 密钥。' : ''));
+      setNotice('已导出。' + (format === 'musicxml' ? '可使用 MuseScore 等专业软件继续编辑；自由节奏的显示时值为近似。' : format === 'json' ? '核验文件包含谱面、模型经阈值解码后的候选与操作记录，不含音频或 API 密钥。' : ''));
     } catch (e) { setError(message(e)); }
   }
 
@@ -264,7 +266,7 @@ function Workbench({user: currentUser}: {user: User}) {
         <div className="sidebar-bottom">
           <div className="user-avatar">{user.displayName.slice(0, 1)}</div>
           <div><strong>{user.displayName}</strong><small>{user.admin ? '管理员' : '专家账号'}</small></div>
-          <button className="logout" title="退出登录" disabled={!!busy} onClick={async () => { if (!allowLeave()) return; reset(); await signOut(); }}>↗</button>
+          <button className="logout" title="退出登录" aria-label="退出登录" disabled={!!busy} onClick={async () => { if (!allowLeave()) return; reset(); await signOut(); }}>↗</button>
         </div>
       </aside>
 
@@ -326,6 +328,11 @@ function Workbench({user: currentUser}: {user: User}) {
                           <option value="free">自由节奏（保留实际时长）</option>
                         </select>
                       </label>
+                      <label className="overlay-label">
+                        <input type="checkbox" checked={preserveShortNotes} disabled={!!busy} onChange={e => setPreserveShortNotes(e.target.checked)} />
+                        短音灵敏模式（约 58ms 阈值，更易产生碎音）
+                      </label>
+                      <p className="subtle">标准模式的候选时长过滤阈值约 0.13 秒，可能略去极短装饰音；请结合原音复核。</p>
                       <label className="overlay-label">
                         <input type="checkbox" checked={crepe} disabled={!!busy} onChange={e => setCrepe(e.target.checked)} />
                         CREPE 轻量实验复核（较慢，只标疑点）
@@ -391,7 +398,7 @@ function Workbench({user: currentUser}: {user: User}) {
                         <button disabled={!!busy} onClick={() => exportWork('svg')}>SVG 矢量简谱<small>印刷与展示</small></button>
                         <button disabled={!!busy} onClick={() => exportWork('musicxml')}>MusicXML 乐谱<small>专业软件继续编辑</small></button>
                         <button disabled={!!busy} onClick={() => exportWork('mid')}>MIDI 旋律<small>试听与编曲</small></button>
-                        <button disabled={!!busy} onClick={() => exportWork('json')}>JSON 核验记录<small>原始事件与校订前后谱面</small></button>
+                        <button disabled={!!busy} onClick={() => exportWork('json')}>JSON 核验记录<small>解码候选与校订前后谱面</small></button>
                       </div></details>
                       <button className="primary" disabled={!!busy} onClick={() => void save()}>{busy === '保存作品中' ? '保存中…' : '保存作品'}</button>
                     </div>
@@ -399,7 +406,7 @@ function Workbench({user: currentUser}: {user: User}) {
 
                   <div className="review-metrics">
                     <div><small>识别来源</small><strong>{engineNames[work.engine]}</strong></div>
-                    <div><small>谱面旋律音数</small><strong>{noteCount}<em> 音</em></strong></div>
+                    <div><small>{hasCandidates ? '识别候选音数' : '谱面有声符号'}</small><strong>{hasCandidates ? work.rawEvents!.length : noteCount}<em>{hasCandidates ? ' 音' : ' 个'}</em></strong></div>
                     <div><small>自动标记疑点</small><strong>{suspects.length}<em> 处</em></strong></div>
                     <div><small>调性与节拍</small><strong>{score!.estimates?.key || score!.estimates?.meter || score!.estimates?.tempo ? '需专家确认' : '当前人工设定'}</strong></div>
                   </div>
@@ -421,7 +428,7 @@ function Workbench({user: currentUser}: {user: User}) {
                           stop(); setWork({...work, score: undo.at(-1)!}); setUndo(undo.slice(0, -1)); setDirty(true); setSelection(null);
                         }}>撤销</button>
                         <span className="chip">{engineNames[work.engine]}</span>
-                        <span>{score!.measures.length} 小节 · {score!.measures.reduce((n, m) => n + m.notes.length, 0)} 音符</span>
+                        <span>{score!.measures.length} 小节 · {score!.measures.reduce((n, m) => n + m.notes.length, 0)} 记谱符号</span>
                         <button className="text-button" disabled={!!busy} onClick={() => {
                           if (window.confirm('恢复为最初识别的谱面？当前谱面修改将被替换。')) { editScore(structuredClone(work.original)); setSelection(null); }
                         }}>恢复原始谱</button>

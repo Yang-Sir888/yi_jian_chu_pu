@@ -63,7 +63,7 @@ export function musicXml(score: Score): string {
 
 export function exportEvidence(work: Work, instruction: string, sourceOffset: number) {
   return JSON.stringify({format: 'guoyun-puyin-review', version: 1, exportedAt: new Date().toISOString(),
-    statement: '识别结果为待校订草稿；原始事件是模型输出，clarity 为模型响应值而非校准后的准确率；合成样例不能代表真实录音表现。',
+    statement: '识别结果为待校订草稿；事件为模型经阈值解码后的候选，clarity 为模型响应值而非校准后的准确率；合成样例不能代表真实录音表现。',
     engine: work.engine, instruction, sourceOffset, score: work.score, original: work.original,
     rawEvents: work.rawEvents || [], review: work.review || [], reviewEngine: work.reviewEngine || 'none',
     modelStatus: work.modelStatus, report: work.report, events: work.events}, null, 2);
