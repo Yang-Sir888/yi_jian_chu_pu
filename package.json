@@ -1,0 +1,14 @@
+{
+  "name": "guoyun-puyin",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "build": "npm --prefix frontend run build && node scripts/build-cloud.mjs",
+    "test": "npm --prefix backend test && node --test cloud/*.test.mjs",
+    "start": "node scripts/start-local.mjs",
+    "setup": "node backend/scripts/setup.mjs"
+  },
+  "devDependencies": {"esbuild": "0.25.12"}
+}

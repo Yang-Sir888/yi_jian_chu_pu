@@ -1,0 +1,6 @@
+{
+  "name": "国韵谱音 - 旋律采谱与专家校订",
+  "version": "3.0.0",
+  "version_description": "新增真实合成音频校验、MusicXML/MIDI/核验导出；修复会话、配置恢复、音频清理；提供持久化本地与Worker云端部署。验证范围见评审证据文档，未声称真实语料准确率。",
+  "preview_type": "pc"
+}

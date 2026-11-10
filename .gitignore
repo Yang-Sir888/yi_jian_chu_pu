@@ -1,0 +1,17 @@
+data
+dist
+docs-viewer-backup
+.env
+.env.tcb
+.model-vault.key
+.lingpu
+*.log
+node_modules
+.data/
+.wrangler/
+.dev.vars
+*.tar.gz
+*.zip
+output/
+tmp/
+*.lock.pid

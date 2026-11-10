@@ -1,0 +1,11 @@
+export type Note={id:string;pitch:number;octave:number;accidental:string;base:number;dots:number;tie:boolean;lyric?:string;sourceId?:string;sourceStart?:number;sourceEnd?:number;durationSeconds?:number;review?:string;exactTicks?:number};
+export type Measure={id:string;notes:Note[];barline?:string};
+export type Score={title:string;subtitle?:string;artist?:string;lyricist?:string;composer?:string;key:string;meter:number[];tempo:number;measures:Measure[];mode?:'metered'|'free';estimates?:{key?:boolean;meter?:boolean;tempo?:boolean}};
+export type Event={kind:'stage'|'tool'|'warn'|'done';text:string};
+export type Engine='basic-pitch'|'yin'|'demo'|'manual';
+export type ModelStatus='success'|'failed'|'unconfigured'|'not_run';
+export type RawEvent={id:string;start:number;end:number;midi:number;clarity:number;review?:string};
+export type Work={score:Score;original:Score;instruction:string;engine:Engine;events:Event[];report:string;modelStatus:ModelStatus;id?:string;version?:number;audioUrl?:string|null;audioName?:string;sourceOffset?:number;rawEvents?:RawEvent[];review?:any[];reviewEngine?:string};
+export type WorkItem={id:string;title:string;engine:Engine;version:number;updated_at:string};
+export type User={id:string;username:string;displayName:string;admin:boolean;mustChange:boolean;disabled?:boolean};
+export type ModelHealth={status:'unconfigured'|'pending'|'success'|'failed';checkedAt:string|null;message:string};

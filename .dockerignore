@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+.git
+.lingpu
+**/.data
+**/.env
+**/.model-vault.key
+.wrangler
+tmp
+output
+*.zip
+*.tar.gz
